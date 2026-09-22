@@ -15,16 +15,10 @@ if (!TOKEN) {
 // 포트폴리오에 우선 노출하거나 강조할 프로젝트 목록 (원하는 대로 커스텀 가능)
 const FEATURED_REPOS = [
   "how-to-use-OCI",
+  "genai-benchmark",
   "workplace-toolkit",
   "ai-lecture-environment",
-  "naver-blog-crawler",
-  "mentor-lane-voice-lab",
-  "mentor-memory-fragments",
-  "genai-benchmark",
   "MSA-k8s-cicd",
-  "dcimg",
-  "fastfind-mac",
-  "seven2",
 ];
 
 // Fork 저장소 중 예외적으로 포트폴리오에 포함할 저장소

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Terminal, ArrowUpRight, Star, Sparkles, ZoomIn, ZoomOut } from "lucide-react";
+import { Terminal, ArrowUpRight, Sparkles, ZoomIn, ZoomOut, Pin } from "lucide-react";
 import type { Project } from "./PortfolioView";
 import { CURATED_PROJECT_DETAILS } from "@/data/projectDetails";
 
@@ -9,6 +9,8 @@ interface RetroTerminalViewProps {
   projects: Project[];
   onSelectProject: (project: Project) => void;
   searchQuery?: string;
+  pinnedRepos?: string[];
+  onTogglePin?: (repoName: string, e?: React.MouseEvent) => void;
 }
 
 function timeAgo(dateString: string): string {
@@ -28,6 +30,8 @@ export default function RetroTerminalView({
   projects,
   onSelectProject,
   searchQuery = "",
+  pinnedRepos,
+  onTogglePin,
 }: RetroTerminalViewProps) {
   // 글씨 크기 모드 (기본: "large"로 넉넉하고 시원하게)
   const [fontSize, setFontSize] = useState<"normal" | "large">("large");
@@ -137,6 +141,10 @@ export default function RetroTerminalView({
                   ? curated.techStack.flatMap((s) => s.items).slice(0, 4)
                   : project.topics.slice(0, 3);
 
+                const isFeatured = pinnedRepos
+                  ? pinnedRepos.includes(project.name)
+                  : project.featured;
+
                 return (
                   <tr
                     key={project.id}
@@ -152,18 +160,29 @@ export default function RetroTerminalView({
                     {/* Repository Name & Lang */}
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-2 flex-wrap">
+                        {onTogglePin && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onTogglePin(project.name, e);
+                            }}
+                            title={isFeatured ? "Featured 해제" : "Featured 지정"}
+                            className={`p-1 rounded transition-colors ${
+                              isFeatured
+                                ? "text-amber-400 hover:text-amber-300"
+                                : "text-slate-600 hover:text-slate-400"
+                            }`}
+                          >
+                            <Pin className={`w-3.5 h-3.5 ${isFeatured ? "fill-amber-400" : ""}`} />
+                          </button>
+                        )}
                         <span className={`font-bold text-cyan-300 group-hover:text-cyan-100 group-hover:underline underline-offset-4 transition-colors ${isLarge ? "text-sm sm:text-base" : "text-xs sm:text-sm"}`}>
                           {project.name}
                         </span>
-                        {project.featured && (
+                        {isFeatured && (
                           <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold">
                             ★ Featured
-                          </span>
-                        )}
-                        {project.stars > 0 && (
-                          <span className="text-xs text-amber-400 flex items-center gap-1 font-semibold">
-                            <Star className="w-3 h-3 fill-amber-400" />
-                            {project.stars}
                           </span>
                         )}
                         <span className={`text-slate-400 group-hover:text-slate-300 font-medium ${isLarge ? "text-xs sm:text-sm" : "text-xs"}`}>

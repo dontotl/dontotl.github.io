@@ -3,8 +3,6 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
 import {
   Search,
-  Star,
-  GitFork,
   ExternalLink,
   Sparkles,
   Calendar,
@@ -14,6 +12,10 @@ import {
   ArrowUpRight,
   Terminal,
   LayoutGrid,
+  Pin,
+  RotateCcw,
+  Check,
+  Share2,
 } from "lucide-react";
 import ProjectModal from "./ProjectModal";
 import RetroTerminalView from "./RetroTerminalView";
@@ -73,6 +75,14 @@ const LANGUAGE_COLORS: Record<string, string> = {
   Other: "bg-slate-600 text-slate-200",
 };
 
+const DEFAULT_FEATURED: string[] = [
+  "how-to-use-OCI",
+  "genai-benchmark",
+  "workplace-toolkit",
+  "ai-lecture-environment",
+  "MSA-k8s-cicd",
+];
+
 function timeAgo(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();
@@ -90,14 +100,74 @@ export default function PortfolioView({ data }: { data: PortfolioData }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLanguage, setSelectedLanguage] = useState<string>("All");
   const [showFeaturedOnly, setShowFeaturedOnly] = useState(false);
-  const [sortBy, setSortBy] = useState<"recent" | "stars" | "name">("recent");
+  const [sortBy, setSortBy] = useState<"recent" | "name">("recent");
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [viewMode, setViewMode] = useState<"terminal" | "cards">("terminal");
+  const [pinnedRepos, setPinnedRepos] = useState<string[]>(DEFAULT_FEATURED);
+  const [copiedFeatured, setCopiedFeatured] = useState(false);
 
   // Fork된 저장소는 제외 (단, how-to-use-OCI 등 예외 허용 프로젝트 포함)
   const originalProjects = useMemo(() => {
     return data.projects.filter((p) => !p.isFork || p.name === "how-to-use-OCI");
   }, [data.projects]);
+
+  // Load pinned repos from URL search param or localStorage
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const featuredParam = params.get("featured");
+      if (featuredParam) {
+        const list = featuredParam.split(",").map((s) => s.trim()).filter(Boolean);
+        if (list.length > 0) {
+          setPinnedRepos(list);
+          return;
+        }
+      }
+      const saved = localStorage.getItem("dontotl_featured_repos");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setPinnedRepos(parsed);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const togglePin = useCallback((repoName: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setPinnedRepos((prev) => {
+      const next = prev.includes(repoName)
+        ? prev.filter((name) => name !== repoName)
+        : [...prev, repoName];
+      try {
+        localStorage.setItem("dontotl_featured_repos", JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, []);
+
+  const resetFeatured = useCallback(() => {
+    setPinnedRepos(DEFAULT_FEATURED);
+    try {
+      localStorage.removeItem("dontotl_featured_repos");
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const copyCustomFeaturedLink = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.origin + window.location.pathname);
+    url.searchParams.set("featured", pinnedRepos.join(","));
+    navigator.clipboard.writeText(url.toString()).then(() => {
+      setCopiedFeatured(true);
+      setTimeout(() => setCopiedFeatured(false), 2000);
+    });
+  }, [pinnedRepos]);
 
   // URL Hash Deep Linking
   const handleSelectProject = useCallback((project: Project | null) => {
@@ -152,7 +222,7 @@ export default function PortfolioView({ data }: { data: PortfolioData }) {
           return false;
         }
 
-        if (showFeaturedOnly && !project.featured) {
+        if (showFeaturedOnly && !pinnedRepos.includes(project.name)) {
           return false;
         }
 
@@ -162,19 +232,16 @@ export default function PortfolioView({ data }: { data: PortfolioData }) {
         if (sortBy === "recent") {
           return new Date(b.pushedAt).getTime() - new Date(a.pushedAt).getTime();
         }
-        if (sortBy === "stars") {
-          return b.stars - a.stars;
-        }
         if (sortBy === "name") {
           return a.name.localeCompare(b.name);
         }
         return 0;
       });
-  }, [originalProjects, searchQuery, selectedLanguage, showFeaturedOnly, sortBy]);
+  }, [originalProjects, searchQuery, selectedLanguage, showFeaturedOnly, sortBy, pinnedRepos]);
 
   const featuredProjects = useMemo(() => {
-    return originalProjects.filter((p) => p.featured);
-  }, [originalProjects]);
+    return originalProjects.filter((p) => pinnedRepos.includes(p.name));
+  }, [originalProjects, pinnedRepos]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100 flex flex-col">
@@ -250,13 +317,47 @@ export default function PortfolioView({ data }: { data: PortfolioData }) {
       {/* Featured Projects Highlight (if any) */}
       {featuredProjects.length > 0 && !searchQuery && selectedLanguage === "All" && (
         <section className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 mb-12">
-          <div className="flex items-center justify-between gap-2 mb-6">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+            <div className="flex items-center gap-2.5">
               <Sparkles className="w-5 h-5 text-indigo-400" />
               <h2 className="text-xl font-bold text-slate-100">Featured Projects</h2>
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-medium">
+                {featuredProjects.length}개 대표작
+              </span>
             </div>
-            <span className="text-xs text-slate-400">카드를 클릭하여 상세 아키텍처 보기</span>
+
+            <div className="flex items-center gap-2 text-xs">
+              <button
+                type="button"
+                onClick={copyCustomFeaturedLink}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/90 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white transition-colors"
+                title="현재 지정된 대표작 목록 링크를 클립보드에 복사합니다"
+              >
+                {copiedFeatured ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-400 font-medium">링크 복사됨!</span>
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>맞춤 링크 복사</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={resetFeatured}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/90 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
+                title="기본 5개 시그니처 대표작으로 초기화합니다"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>기본값 리셋</span>
+              </button>
+            </div>
           </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {featuredProjects.map((project) => {
               const curated = CURATED_PROJECT_DETAILS[project.name];
@@ -286,6 +387,14 @@ export default function PortfolioView({ data }: { data: PortfolioData }) {
                         )}
                       </div>
                       <div className="flex items-center gap-2 text-xs text-slate-400 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => togglePin(project.name, e)}
+                          title="대표작(Featured) 해제"
+                          className="p-1.5 rounded-lg bg-indigo-900/70 hover:bg-indigo-800 text-indigo-300 border border-indigo-700/50 transition-colors"
+                        >
+                          <Pin className="w-3.5 h-3.5 fill-indigo-400 text-indigo-400" />
+                        </button>
                         <span className="flex items-center gap-1">
                           <RefreshCw className="w-3 h-3" /> {timeAgo(project.pushedAt)}
                         </span>
@@ -316,12 +425,16 @@ export default function PortfolioView({ data }: { data: PortfolioData }) {
                     )}
 
                     <div className="flex items-center justify-between pt-4 border-t border-indigo-500/20 text-xs">
-                      <div className="flex items-center gap-3 text-slate-400">
-                        <span className="flex items-center gap-1">
-                          <Star className="w-3.5 h-3.5 text-amber-400" /> {project.stars}
+                      <div className="flex items-center gap-2 text-slate-400">
+                        <span
+                          className={`text-[10px] font-medium px-2 py-0.5 rounded-md ${
+                            LANGUAGE_COLORS[project.language] || LANGUAGE_COLORS.Other
+                          }`}
+                        >
+                          {project.language}
                         </span>
-                        <span className="flex items-center gap-1">
-                          <GitFork className="w-3.5 h-3.5 text-slate-400" /> {project.forks}
+                        <span className="text-slate-500 text-[11px]">
+                          업데이트 {timeAgo(project.pushedAt)}
                         </span>
                       </div>
 
@@ -336,32 +449,32 @@ export default function PortfolioView({ data }: { data: PortfolioData }) {
                         >
                           상세 보기 <ArrowUpRight className="w-3.5 h-3.5" />
                         </button>
-                      {project.homepage && (
+                        {project.homepage && (
+                          <a
+                            href={project.homepage}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition-colors shadow-md shadow-indigo-600/20"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" /> Live Demo
+                          </a>
+                        )}
                         <a
-                          href={project.homepage}
+                          href={project.htmlUrl}
                           target="_blank"
                           rel="noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition-colors shadow-md shadow-indigo-600/20"
+                          className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"
                         >
-                          <ExternalLink className="w-3.5 h-3.5" /> Live Demo
+                          <GithubIcon className="w-3.5 h-3.5" /> Code
                         </a>
-                      )}
-                      <a
-                        href={project.htmlUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"
-                      >
-                        <GithubIcon className="w-3.5 h-3.5" /> Code
-                      </a>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
           </div>
         </section>
       )}
@@ -430,11 +543,10 @@ export default function PortfolioView({ data }: { data: PortfolioData }) {
 
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as "recent" | "stars" | "name")}
+                onChange={(e) => setSortBy(e.target.value as "recent" | "name")}
                 className="text-xs px-3 py-2 rounded-xl bg-slate-950/60 border border-slate-800 text-slate-300 focus:outline-none focus:border-indigo-500"
               >
                 <option value="recent">최근 업데이트순</option>
-                <option value="stars">Star 많은순</option>
                 <option value="name">이름 가나다순</option>
               </select>
             </div>
@@ -485,6 +597,8 @@ export default function PortfolioView({ data }: { data: PortfolioData }) {
             projects={filteredProjects}
             onSelectProject={handleSelectProject}
             searchQuery={searchQuery}
+            pinnedRepos={pinnedRepos}
+            onTogglePin={togglePin}
           />
         ) : filteredProjects.length === 0 ? (
           <div className="py-20 text-center rounded-2xl border border-dashed border-slate-800 bg-slate-900/20">
@@ -499,6 +613,7 @@ export default function PortfolioView({ data }: { data: PortfolioData }) {
               const topTechs = curated?.techStack
                 ? curated.techStack.flatMap((s) => s.items).slice(0, 3)
                 : project.topics.slice(0, 3);
+              const isPinned = pinnedRepos.includes(project.name);
 
               return (
                 <div
@@ -524,6 +639,18 @@ export default function PortfolioView({ data }: { data: PortfolioData }) {
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 text-[11px] text-slate-500 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => togglePin(project.name, e)}
+                          title={isPinned ? "대표작(Featured) 해제" : "대표작(Featured) 지정"}
+                          className={`p-1 rounded-md transition-colors ${
+                            isPinned
+                              ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/40"
+                              : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/60"
+                          }`}
+                        >
+                          <Pin className={`w-3 h-3 ${isPinned ? "fill-indigo-400 text-indigo-400" : ""}`} />
+                        </button>
                         <span>{timeAgo(project.pushedAt)}</span>
                         <ArrowUpRight className="w-3.5 h-3.5 text-slate-600 group-hover:text-indigo-400 transition-colors" />
                       </div>
@@ -552,55 +679,50 @@ export default function PortfolioView({ data }: { data: PortfolioData }) {
                       </div>
                     )}
 
-                  <div className="flex items-center justify-between pt-3 border-t border-slate-800/60 text-xs">
-                    <div className="flex items-center gap-3 text-slate-400">
-                      <span className="flex items-center gap-1">
-                        <Star className="w-3.5 h-3.5 text-amber-400" /> {project.stars}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <GitFork className="w-3.5 h-3.5 text-slate-400" /> {project.forks}
-                      </span>
-                    </div>
+                    <div className="flex items-center justify-between pt-3 border-t border-slate-800/60 text-xs">
+                      <div className="flex items-center gap-2 text-slate-500 text-[11px]">
+                        <span>업데이트 {timeAgo(project.pushedAt)}</span>
+                      </div>
 
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelectProject(project);
-                        }}
-                        className="text-[11px] px-2.5 py-1 rounded-lg bg-indigo-950/80 hover:bg-indigo-600 text-indigo-200 hover:text-white border border-indigo-700/50 transition-colors font-medium flex items-center gap-1 cursor-pointer"
-                      >
-                        상세 보기 <ArrowUpRight className="w-3 h-3" />
-                      </button>
-                      {project.homepage && (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectProject(project);
+                          }}
+                          className="text-[11px] px-2.5 py-1 rounded-lg bg-indigo-950/80 hover:bg-indigo-600 text-indigo-200 hover:text-white border border-indigo-700/50 transition-colors font-medium flex items-center gap-1 cursor-pointer"
+                        >
+                          상세 보기 <ArrowUpRight className="w-3 h-3" />
+                        </button>
+                        {project.homepage && (
+                          <a
+                            href={project.homepage}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Live Demo"
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-1.5 rounded-lg bg-indigo-950/60 hover:bg-indigo-600 text-indigo-300 hover:text-white transition-colors"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        )}
                         <a
-                          href={project.homepage}
+                          href={project.htmlUrl}
                           target="_blank"
                           rel="noreferrer"
-                          title="Live Demo"
+                          title="GitHub Repository"
                           onClick={(e) => e.stopPropagation()}
-                          className="p-1.5 rounded-lg bg-indigo-950/60 hover:bg-indigo-600 text-indigo-300 hover:text-white transition-colors"
+                          className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
                         >
-                          <ExternalLink className="w-3.5 h-3.5" />
+                          <GithubIcon className="w-3.5 h-3.5" />
                         </a>
-                      )}
-                      <a
-                        href={project.htmlUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        title="GitHub Repository"
-                        onClick={(e) => e.stopPropagation()}
-                        className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
-                      >
-                        <GithubIcon className="w-3.5 h-3.5" />
-                      </a>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
           </div>
         )}
       </main>

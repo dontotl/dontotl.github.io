@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import {
   X,
   ExternalLink,
-  Star,
-  GitFork,
   Layers,
   CheckCircle2,
   Cpu,
@@ -243,15 +241,15 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
           <section className="pt-2 border-t border-slate-800/80">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-xs">
               <div className="p-3 rounded-xl bg-slate-950/30 border border-slate-800/60">
-                <span className="text-slate-400 block mb-1">GitHub Stars</span>
-                <span className="font-bold text-sm text-amber-400 flex items-center justify-center gap-1">
-                  <Star className="w-3.5 h-3.5" /> {project.stars}
+                <span className="text-slate-400 block mb-1">저장소 유형</span>
+                <span className="font-semibold text-sm text-emerald-400 flex items-center justify-center">
+                  Public Open Source
                 </span>
               </div>
               <div className="p-3 rounded-xl bg-slate-950/30 border border-slate-800/60">
-                <span className="text-slate-400 block mb-1">Forks</span>
-                <span className="font-bold text-sm text-slate-200 flex items-center justify-center gap-1">
-                  <GitFork className="w-3.5 h-3.5" /> {project.forks}
+                <span className="text-slate-400 block mb-1">주요 스택</span>
+                <span className="font-semibold text-sm text-indigo-300 flex items-center justify-center">
+                  {project.language || "Multi-stack"}
                 </span>
               </div>
               <div className="p-3 rounded-xl bg-slate-950/30 border border-slate-800/60">
